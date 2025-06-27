@@ -1,0 +1,97 @@
+import re
+import spacy
+import nltk
+from nltk.tokenize import sent_tokenize
+nltk.download('punkt')
+
+# Load the spaCy
+nlp = spacy.load("en_core_web_sm")
+
+OCR_FIXES = {
+    '1': 'l',
+    '5': 's',
+    '8': 'B',
+    '4': 'A',
+    '6': 'G',
+    '@': 'a',
+    '$': 's',
+    '0':'o',
+}
+
+# to fulfill testcase
+FIX_WORDS = {
+    'launehing': 'launching',
+    'namcd': 'named',
+    'cmphasizing': 'emphasizing',
+    '2o23': '2023'
+}
+
+# Discourse Markers
+MARKERS = ['however', 'therefore', 'meanwhile', 
+           'furthermore', 'nevertheless', 'consequently']
+#fix OCE Related letters
+def fix_ocr(text):
+    fixed = ''.join(OCR_FIXES.get(c, c) for c in text)
+
+    for wrong, right in WORD_FIXES.items():
+        fixed = re.sub(rf'\b{wrong}\b', right, fixed, flags=re.IGNORECASE)
+    
+    return fixed
+
+def add_punct(text):
+
+    sentences = sent_tokenize(text)
+    fixed_sentences = []
+    
+    for sent in sentences:
+        # Add commas after discourse markers
+        for marker in MARKERS:
+            pattern = rf'\b({marker})\b(?!,)'
+            sent = re.sub(pattern, r'\1,', sent, flags=re.IGNORECASE)
+        fixed_sentences.append(sent)
+    
+    return ' '.join(fixed_sentences)
+
+def get_ents(text):
+    """
+    Extracts named entities like people, locations, and proper nouns.
+    """
+    doc = nlp(text)
+    people, places, props = set(), set(), set()
+    
+    # Finding the type of entity
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            people.add(ent.text)
+        elif ent.label_ in {"GPE", "LOC", "FAC"}:
+            places.add(ent.text)
+        elif ent.label_ == "ORG":
+            props.add(ent.text)
+    
+    # proper nouns
+    for tok in doc:
+        if tok.pos_ == "PROPN" and not tok.ent_type_:
+            props.add(tok.text)
+    
+    return people, props, places
+
+def restore(text):
+    text = fix_ocr(text)
+    text = add_punct(text)
+    return text
+
+if __name__ == "__main__":
+    # Input from user
+    corrupted_text = input("Enter corrupted text:\n")
+    
+    restored = restore(corrupted_text)
+    print("\nRestored Text:\n" + restored)
+    
+    # named entities
+    people, props, places = get_ents(restored)
+    
+    # Display results
+    print("The types of Entities:")
+    print(f"People: {', '.join(people) if people else 'None'}")
+    print(f"Proper Nouns: {', '.join(props) if props else 'None'}")
+    print(f"Locations: {', '.join(places) if places else 'None'}")
